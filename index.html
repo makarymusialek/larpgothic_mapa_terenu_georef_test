@@ -192,10 +192,44 @@
                 last.style.display = "none";
             }
         });
-		var overlaysTree = [
-   		 	{label: "mapa spec 1_modified", layer: layer_mapaspec1_modified_0},
-   			{label: "Punkty z Google Sheets", layer: sheetLayer},
-		]
+
+        // Punkty z Google Sheets
+        var googleSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6hDUKaTzqzqCO4t7EVR9hGsn0dQXY1cgVL9-CZa5OqyVRwOYcEWiAthOKBHUv28Fmi7Fs6NWcP8Ag/pub?gid=0&single=true&output=csv";
+        var sheetLayer = L.layerGroup().addTo(map);
+
+        Papa.parse(googleSheetUrl, {
+            download: true,
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                results.data.forEach(function(row) {
+
+                    if ((row.visible || "").trim().toUpperCase() !== "TRUE") {
+                        return;
+                    }
+
+                    var lat = parseFloat((row.lat || "").replace(",", "."));
+                    var lon = parseFloat((row.lon || "").replace(",", "."));
+
+                    if (isNaN(lat) || isNaN(lon)) {
+                        return;
+                    }
+
+                    var marker = L.marker([lat, lon]).bindPopup(
+                        "<b>" + (row.name || "Bez nazwy") + "</b><br>" +
+                        "<i>" + (row.type || "") + "</i><br><br>" +
+                        (row.description || "")
+                    );
+
+                    sheetLayer.addLayer(marker);
+                });
+            }
+        });
+
+        var overlaysTree = [
+            {label: "mapa spec 1_modified", layer: layer_mapaspec1_modified_0},
+            {label: "Punkty z Google Sheets", layer: sheetLayer},
+        ]
         var lay = L.control.layers.tree(null, overlaysTree,{
             //namedToggle: true,
             //selectorBack: false,
@@ -262,93 +296,54 @@
                 return this._bounds;
             }
         });
-	map.on('click', function(e) {
 
-    let coords =
-        e.latlng.lat.toFixed(6) +
-        ', ' +
-        e.latlng.lng.toFixed(6);
+        // Kliknięcie w mapę: pokazuje współrzędne i formularz dodania punktu
+        var appsScriptUrl = "https://script.google.com/macros/s/AKfycbzHd0pX9-XJ6C97coZxtHeUsMj7YyW9UVA-T96s4as-vSVAYIL3D_klOTc5qjjVeSVDrg/exec";
 
-    navigator.clipboard.writeText(coords);
+        map.on('click', function(e) {
+            var lat = e.latlng.lat.toFixed(6);
+            var lon = e.latlng.lng.toFixed(6);
+            var coords = lat + ', ' + lon;
 
-    L.popup()
-        .setLatLng(e.latlng)
-        .setContent(
-            '<b>Współrzędne</b><br>' +
-            coords +
-            '<br><br>📋 Skopiowano do schowka'
-        )
-        .openOn(map);
-
-});
-			var googleSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6hDUKaTzqzqCO4t7EVR9hGsn0dQXY1cgVL9-CZa5OqyVRwOYcEWiAthOKBHUv28Fmi7Fs6NWcP8Ag/pub?gid=0&single=true&output=csv";
-
-var sheetLayer = L.layerGroup().addTo(map);
-
-Papa.parse(googleSheetUrl, {
-    download: true,
-    header: true,
-    complete: function(results) {
-        results.data.forEach(function(row) {
-
-            if (row.visible !== "TRUE") {
-                return;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(coords);
             }
 
-            var lat = parseFloat(row.lat);
-            var lng = parseFloat(row.lon);
+            var formHtml = `
+                <b>Współrzędne</b><br>
+                ${coords}<br>
+                📋 Skopiowano do schowka
+                <hr>
+                <b>Dodaj punkt</b><br><br>
+                <input id="p_name" placeholder="Nazwa" style="width:190px"><br><br>
+                <input id="p_type" placeholder="Typ" style="width:190px"><br><br>
+                <textarea id="p_desc" placeholder="Opis" style="width:190px;height:80px"></textarea><br><br>
+                <button onclick="savePoint('${lat}', '${lon}')">Zapisz punkt</button>
+            `;
 
-            if (isNaN(lat) || isNaN(lng)) {
-                return;
-            }
-
-            var marker = L.marker([lat, lng]).bindPopup(
-                "<b>" + row.name + "</b><br>" +
-                "<i>" + row.type + "</i><br><br>" +
-                row.description
-            );
-
-            sheetLayer.addLayer(marker);
+            L.popup()
+                .setLatLng(e.latlng)
+                .setContent(formHtml)
+                .openOn(map);
         });
-    }
-});
-			var appsScriptUrl = "https://script.google.com/macros/s/AKfycbxx0J-n7v8v0bWyWhjjOpBvXLaSPklLZvopm7lJ93QdoXLfU0lPsZVw7n4JWQRMvFeFzQ/exec";
 
-map.on('click', function(e) {
-    var lat = e.latlng.lat.toFixed(6);
-    var lng = e.latlng.lng.toFixed(6);
+        function savePoint(lat, lon) {
+            var formData = new FormData();
+            formData.append("name", document.getElementById("p_name").value);
+            formData.append("type", document.getElementById("p_type").value);
+            formData.append("lat", lat);
+            formData.append("lon", lon);
+            formData.append("description", document.getElementById("p_desc").value);
 
-    var formHtml = `
-        <b>Dodaj punkt</b><br><br>
-        <input id="p_name" placeholder="Nazwa"><br>
-        <input id="p_type" placeholder="Typ"><br>
-        <textarea id="p_desc" placeholder="Opis"></textarea><br>
-        <button onclick="savePoint(${lat}, ${lng})">Zapisz</button>
-    `;
+            fetch(appsScriptUrl, {
+                method: "POST",
+                mode: "no-cors",
+                body: formData
+            });
 
-    L.popup()
-        .setLatLng(e.latlng)
-        .setContent(formHtml)
-        .openOn(map);
-});
-
-function savePoint(lat, lng) {
-    fetch(appsScriptUrl, {
-        method: "POST",
-        mode: "no-cors",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-            name: document.getElementById("p_name").value,
-            type: document.getElementById("p_type").value,
-            lat: lat,
-            lng: lng,
-            description: document.getElementById("p_desc").value
-        })
-    });
-
-    alert("Wysłano punkt do zatwierdzenia.");
-    map.closePopup();
-}
+            alert("Wysłano punkt do arkusza jako FALSE.");
+            map.closePopup();
+        }
         </script>        
     </body>
 </html>
