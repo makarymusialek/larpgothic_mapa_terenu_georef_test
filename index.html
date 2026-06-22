@@ -297,24 +297,71 @@
             }
         });
 
-        // Kliknięcie w mapę: pokazuje współrzędne i formularz dodania punktu
-        var appsScriptUrl = "https://script.google.com/macros/s/AKfycbzHd0pX9-XJ6C97coZxtHeUsMj7YyW9UVA-T96s4as-vSVAYIL3D_klOTc5qjjVeSVDrg/exec";
+        // === TRYBY PRACY MAPY ===
+        // coords = klik pokazuje i kopiuje współrzędne
+        // add    = klik otwiera formularz dodania punktu do Google Sheets
+        var activeMode = "coords";
+        var appsScriptUrl = "https://script.google.com/macros/s/AKfycbzvRuOIX6LJLc6OX5C4fx02nOPMxE8vzrBL4o-YRtDOGQsy81y_YQiKdo6eGsMn7djYhg/exec";
 
-        map.on('click', function(e) {
+        function copyTextToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text);
+            }
+
+            // Fallback dla lokalnego pliku / HTTP
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            return new Promise(function(resolve, reject) {
+                try {
+                    document.execCommand("copy") ? resolve() : reject();
+                } catch (err) {
+                    reject(err);
+                }
+                document.body.removeChild(textArea);
+            });
+        }
+
+        function showCoordsPopup(e) {
             var lat = e.latlng.lat.toFixed(6);
             var lon = e.latlng.lng.toFixed(6);
             var coords = lat + ', ' + lon;
 
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(coords);
-            }
+            copyTextToClipboard(coords).then(function() {
+                L.popup()
+                    .setLatLng(e.latlng)
+                    .setContent(
+                        '<b>Współrzędne</b><br>' +
+                        coords +
+                        '<br><br>📋 Skopiowano do schowka'
+                    )
+                    .openOn(map);
+            }).catch(function() {
+                L.popup()
+                    .setLatLng(e.latlng)
+                    .setContent(
+                        '<b>Współrzędne</b><br>' +
+                        coords +
+                        '<br><br><button onclick="copyTextToClipboard(\'' + coords + '\')">Kopiuj</button>'
+                    )
+                    .openOn(map);
+            });
+        }
+
+        function showAddPointPopup(e) {
+            var lat = e.latlng.lat.toFixed(6);
+            var lon = e.latlng.lng.toFixed(6);
+            var coords = lat + ', ' + lon;
 
             var formHtml = `
-                <b>Współrzędne</b><br>
-                ${coords}<br>
-                📋 Skopiowano do schowka
-                <hr>
-                <b>Dodaj punkt</b><br><br>
+                <b>Dodaj punkt</b><br>
+                <small>${coords}</small><br><br>
                 <input id="p_name" placeholder="Nazwa" style="width:190px"><br><br>
                 <input id="p_type" placeholder="Typ" style="width:190px"><br><br>
                 <textarea id="p_desc" placeholder="Opis" style="width:190px;height:80px"></textarea><br><br>
@@ -325,6 +372,14 @@
                 .setLatLng(e.latlng)
                 .setContent(formHtml)
                 .openOn(map);
+        }
+
+        map.on('click', function(e) {
+            if (activeMode === "coords") {
+                showCoordsPopup(e);
+            } else if (activeMode === "add") {
+                showAddPointPopup(e);
+            }
         });
 
         function savePoint(lat, lon) {
@@ -344,6 +399,38 @@
             alert("Wysłano punkt do arkusza jako FALSE.");
             map.closePopup();
         }
+
+        // Panel wyboru trybu
+        var ModeControl = L.Control.extend({
+            options: { position: 'topright' },
+            onAdd: function(map) {
+                var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                container.style.background = 'white';
+                container.style.padding = '6px';
+                container.style.lineHeight = '1.4';
+                container.style.fontSize = '13px';
+                container.style.minWidth = '150px';
+
+                container.innerHTML = `
+                    <b>Tryb mapy</b><br>
+                    <label><input type="radio" name="mapMode" value="coords" checked> Współrzędne</label><br>
+                    <label><input type="radio" name="mapMode" value="add"> Dodaj punkt</label>
+                `;
+
+                L.DomEvent.disableClickPropagation(container);
+                L.DomEvent.disableScrollPropagation(container);
+
+                container.querySelectorAll('input[name="mapMode"]').forEach(function(input) {
+                    input.addEventListener('change', function() {
+                        activeMode = this.value;
+                        map.closePopup();
+                    });
+                });
+
+                return container;
+            }
+        });
+        map.addControl(new ModeControl());
         </script>        
     </body>
 </html>
