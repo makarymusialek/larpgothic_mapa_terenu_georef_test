@@ -312,6 +312,43 @@ Papa.parse(googleSheetUrl, {
         });
     }
 });
+			var appsScriptUrl = "TU_WKLEJ_URL_WEB_APP";
+
+map.on('click', function(e) {
+    var lat = e.latlng.lat.toFixed(6);
+    var lng = e.latlng.lng.toFixed(6);
+
+    var formHtml = `
+        <b>Dodaj punkt</b><br><br>
+        <input id="p_name" placeholder="Nazwa"><br>
+        <input id="p_type" placeholder="Typ"><br>
+        <textarea id="p_desc" placeholder="Opis"></textarea><br>
+        <button onclick="savePoint(${lat}, ${lng})">Zapisz</button>
+    `;
+
+    L.popup()
+        .setLatLng(e.latlng)
+        .setContent(formHtml)
+        .openOn(map);
+});
+
+function savePoint(lat, lng) {
+    fetch(appsScriptUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            name: document.getElementById("p_name").value,
+            type: document.getElementById("p_type").value,
+            lat: lat,
+            lng: lng,
+            description: document.getElementById("p_desc").value
+        })
+    });
+
+    alert("Wysłano punkt do zatwierdzenia.");
+    map.closePopup();
+}
         </script>        
     </body>
 </html>
