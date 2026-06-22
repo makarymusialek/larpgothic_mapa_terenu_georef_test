@@ -383,23 +383,46 @@
         });
 
         function savePoint(lat, lon) {
-            var formData = new FormData();
-            formData.append("name", document.getElementById("p_name").value);
-            formData.append("type", document.getElementById("p_type").value);
-            formData.append("lat", lat);
-            formData.append("lon", lon);
-            formData.append("description", document.getElementById("p_desc").value);
+   			var name = document.getElementById("p_name").value;
+   			var type = document.getElementById("p_type").value;
+			var desc = document.getElementById("p_desc").value;
 
-            fetch(appsScriptUrl, {
-                method: "POST",
-                mode: "no-cors",
-                body: formData
-            });
+   			var iframe = document.createElement("iframe");
+    		iframe.name = "hidden_iframe";
+    		iframe.style.display = "none";
+    		document.body.appendChild(iframe);
 
-            alert("Wysłano punkt do arkusza jako FALSE.");
-            map.closePopup();
-        }
+    		var form = document.createElement("form");
+    		form.method = "POST";
+    		form.action = appsScriptUrl;
+    		form.target = "hidden_iframe";
+    		form.style.display = "none";
 
+    		function addField(key, value) {
+        		var input = document.createElement("input");
+        		input.type = "hidden";
+      			input.name = key;
+     			input.value = value;
+       		 	form.appendChild(input);
+    		}
+
+    		addField("name", name);
+    		addField("type", type);
+		    addField("lat", lat);
+		    addField("lon", lon);
+		    addField("description", desc);
+
+		    document.body.appendChild(form);
+		    form.submit();
+		
+		    alert("Wysłano punkt do arkusza jako FALSE.");
+		    map.closePopup();
+		
+		    setTimeout(function() {
+		        document.body.removeChild(form);
+		        document.body.removeChild(iframe);
+		    }, 3000);
+		}
         // Panel wyboru trybu
         var ModeControl = L.Control.extend({
             options: { position: 'topright' },
