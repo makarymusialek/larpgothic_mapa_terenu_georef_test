@@ -39,6 +39,7 @@
         <script src="js/labels.js"></script>
         <script src="js/leaflet.photon.js"></script>
         <script src="js/leaflet-measure.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
         <script>
         var highlightLayer;
         function highlightFeature(e) {
@@ -191,8 +192,10 @@
                 last.style.display = "none";
             }
         });
-        var overlaysTree = [
-            {label: "mapa spec 1_modified", layer: layer_mapaspec1_modified_0},]
+		var overlaysTree = [
+   		 	{label: "mapa spec 1_modified", layer: layer_mapaspec1_modified_0},
+   			{label: "Punkty z Google Sheets", layer: sheetLayer},
+		]
         var lay = L.control.layers.tree(null, overlaysTree,{
             //namedToggle: true,
             //selectorBack: false,
@@ -277,6 +280,37 @@
         )
         .openOn(map);
 
+});
+			var googleSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6hDUKaTzqzqCO4t7EVR9hGsn0dQXY1cgVL9-CZa5OqyVRwOYcEWiAthOKBHUv28Fmi7Fs6NWcP8Ag/pub?gid=0&single=true&output=csv";
+
+var sheetLayer = L.layerGroup().addTo(map);
+
+Papa.parse(googleSheetUrl, {
+    download: true,
+    header: true,
+    complete: function(results) {
+        results.data.forEach(function(row) {
+
+            if (row.visible !== "TRUE") {
+                return;
+            }
+
+            var lat = parseFloat(row.lat);
+            var lng = parseFloat(row.lon);
+
+            if (isNaN(lat) || isNaN(lng)) {
+                return;
+            }
+
+            var marker = L.marker([lat, lng]).bindPopup(
+                "<b>" + row.name + "</b><br>" +
+                "<i>" + row.type + "</i><br><br>" +
+                row.description
+            );
+
+            sheetLayer.addLayer(marker);
+        });
+    }
 });
         </script>        
     </body>
